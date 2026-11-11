@@ -2,6 +2,7 @@ package com.serviceplus.UserManagement.tracking;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.serviceplus.UserManagement.Controller.TrackingOtpController;
+import com.serviceplus.UserManagement.security.TrackingPeerCertificateAuthorization;
 import com.serviceplus.UserManagement.Dto.NotificationRequestDTO;
 import com.serviceplus.UserManagement.Dto.NotificationResponseDTO;
 import com.serviceplus.UserManagement.ExceptionHandler.SPRuntimeError;
@@ -216,45 +217,54 @@ class TrackingOtpTest {
     }
 
     @Test
-    void internalEndpointsRejectMissingWrongOrUnconfiguredToken() {
+    void internalEndpointsRejectUntrustedCallers() {
         TrackingOtpService delegate = mock(TrackingOtpService.class);
         TrackingOtpController controller = new TrackingOtpController(delegate);
-        ReflectionTestUtils.setField(controller, "trackingInternalToken", "test-token");
-        for (String token : new String[] {null, "wrong"}) {
-            assertEquals(403, controller.sendOtp(Map.of(), token, request).getStatusCode().value());
-            assertEquals(403, controller.sendEmailOtp(Map.of(), token, request).getStatusCode().value());
-            assertEquals(403, controller.verifyOtp(Map.of(), token).getStatusCode().value());
-        }
-        ReflectionTestUtils.setField(controller, "trackingInternalToken", " ");
-        assertEquals(403, controller.verifyOtp(Map.of(), " ").getStatusCode().value());
+        TrackingPeerCertificateAuthorization guard = mock(TrackingPeerCertificateAuthorization.class);
+        ReflectionTestUtils.setField(controller, "trackingPeerAuthorization", guard);
+        assertEquals(403, controller.sendOtp(Map.of(), request).getStatusCode().value());
+        assertEquals(403, controller.sendEmailOtp(Map.of(), request).getStatusCode().value());
+        assertEquals(403, controller.verifyOtp(Map.of(), request).getStatusCode().value());
+        verify(guard, times(3)).authorized(request);
         verifyNoInteractions(delegate);
     }
+
 
     @Test
     void internalControllerPreservesOtpContractsAndServiceScope() {
         TrackingOtpService delegate = mock(TrackingOtpService.class);
         TrackingOtpController controller = new TrackingOtpController(delegate);
-        ReflectionTestUtils.setField(controller, "trackingInternalToken", "test-token");
-        when(delegate.sendOtp(request, "tenant", 7, null, "O", "MOBILE_OTP", "919999900000")).thenReturn("challenge");
-        assertEquals(Map.of("challengeId", "challenge", "message", "OTP request processed"), controller.sendOtp(
-                Map.of("tenantId", "tenant", "serviceId", 7, "mode", "O", "method", "MOBILE_OTP", "contact", "919999900000"),
-                "test-token", request).getBody());
+        TrackingPeerCertificateAuthorization guard = mock(TrackingPeerCertificateAuthorization.class);
+        ReflectionTestUtils.setField(controller, "trackingPeerAuthorization", guard);
+        when(guard.authorized(request)).thenReturn(true);
+        when(delegate.sendOtp(request, "tenant", 7, null, "O", "MOBILE_OTP", "919999900000"))
+                .thenReturn("challenge");
+        assertEquals(Map.of("challengeId", "challenge", "message", "OTP request processed"),
+                controller.sendOtp(
+                    Map.of("tenantId", "tenant", "serviceId", 7, "mode", "O",
+                            "method", "MOBILE_OTP", "contact", "919999900000"), request).getBody());
         Map<String, Object> scope = Map.of("tenantId", "tenant", "serviceId", 7, "purpose", "PUBLIC_TRACKING");
         when(delegate.verifyOtp("challenge", "123456")).thenReturn(scope);
         assertEquals(Map.of("verified", true, "verificationData", scope),
-                controller.verifyOtp(Map.of("challengeId", "challenge", "otp", "123456"), "test-token").getBody());
+                controller.verifyOtp(Map.of("challengeId", "challenge", "otp", "123456"), request).getBody());
     }
+
 
     @ParameterizedTest
     @ValueSource(doubles = {0, -1, 7.5, 2147483648d})
     void controllerRejectsInvalidServiceNumbers(double id) {
         TrackingOtpService delegate = mock(TrackingOtpService.class);
         TrackingOtpController controller = new TrackingOtpController(delegate);
-        ReflectionTestUtils.setField(controller, "trackingInternalToken", "test-token");
-        assertEquals(400, controller.sendOtp(Map.of("tenantId", "tenant", "serviceId", id, "mode", "O",
-                "method", "EMAIL_OTP", "contact", "a@example.invalid"), "test-token", request).getStatusCode().value());
+        TrackingPeerCertificateAuthorization guard = mock(TrackingPeerCertificateAuthorization.class);
+        ReflectionTestUtils.setField(controller, "trackingPeerAuthorization", guard);
+        when(guard.authorized(request)).thenReturn(true);
+        assertEquals(400, controller.sendOtp(
+                Map.of("tenantId", "tenant", "serviceId", id, "mode", "O",
+                        "method", "EMAIL_OTP", "contact", "a@example.invalid"), request)
+                .getStatusCode().value());
         verifyNoInteractions(delegate);
     }
+
 
     @Test
     void sharedRedisPreservesTrackingTtlAndProfileEmailMobileNamespaces() {
