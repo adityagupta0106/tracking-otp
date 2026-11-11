@@ -116,27 +116,26 @@ class ApplicationTrackingServiceRegressionTest {
     void existingReferenceEmailOtpPreservesTenantScopeAndUsesConfiguredContact() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("SP-Client-Domain", "tenant.example");
-        ReflectionTestUtils.setField(service, "trackingInternalToken", "internal-test-token");
         when(registry.fetchTenantId(Map.of("SP-Client-Domain", "tenant.example")))
                 .thenReturn(ResponseEntity.ok("tenant"));
         when(tracking.findByApplRefNoAndApplyDateAndTenantIdOrderByProcessIdAsc(
                 "REF", java.time.LocalDate.of(2026, 1, 1).atStartOfDay(), "tenant"))
                 .thenReturn(List.of(row(5)));
-        when(metadata.getPublicTrackingConfiguration("internal-test-token", 7L, "tenant"))
+        when(metadata.getPublicTrackingConfiguration(7L, "tenant"))
                 .thenReturn(Map.of("trackingTypes", List.of("EMAIL_OTP"),
                         "emailAttribute", Map.of("attributeId", "email")));
-        when(forms.getTrackingApplicationData("internal-test-token", Map.of("tenantId", "tenant",
+        when(forms.getTrackingApplicationData(Map.of("tenantId", "tenant",
                 "serviceId", 7, "applId", "app", "attributeIds", List.of("email"))))
                 .thenReturn(ResponseEntity.ok(Map.of("attributeValues", Map.of("email", "saved@example.test"))));
         Map<String, Object> otpRequest = Map.of("tenantId", "tenant", "serviceId", 7,
                 "applId", "app", "mode", "R", "email", "saved@example.test");
-        when(users.sendTrackingEmailOtp("internal-test-token", otpRequest))
+        when(users.sendTrackingEmailOtp(otpRequest))
                 .thenReturn(ResponseEntity.ok(Map.of("challengeId", "challenge")));
         PublicApplicationTrackingRequest reference = new PublicApplicationTrackingRequest();
         reference.setApplRefNo("REF"); reference.setApplyDate("01/01/2026");
         assertEquals(Map.of("challengeId", "challenge", "message", "OTP request processed"),
                 service.sendReferenceEmailOtp(reference, request));
-        verify(users).sendTrackingEmailOtp("internal-test-token", otpRequest);
+        verify(users).sendTrackingEmailOtp(otpRequest);
         verifyNoInteractions(inbox, holders, documents, custom, applicants);
     }
 }
