@@ -666,55 +666,120 @@ public Map<String, Object> sendServiceTrackingOtp(
 }
 
 
-    public Map<String,Object> verifyServiceTrackingOtp(Map<String,Object> body,HttpServletRequest request) {
-        onlyFields(body,"serviceId","requestId","otp");
-        int service=modeOService(body);String tenant=resolveTenantId(request);
-        publicAuthorization.rateLimit(tenant,service,request.getRemoteAddr());
-        Map<String,Object> state=publicAuthorization.request(Objects.toString(body.get("requestId"),""));
-        if(!tenant.equals(state.get("tenantId")) || !Integer.valueOf(service).equals(state.get("serviceId"))) throw PublicTrackingAuthorizationService.denied();
-        String method=Objects.toString(state.get("method"),"");
-        Map<String,Object> config=modeOConfig(tenant,service,method);
-        if(!publicAuthorization.fingerprint(config).equals(state.get("configuration")) || !state.containsKey("challengeId")) throw PublicTrackingAuthorizationService.denied();
-        if(!(body.get("otp") instanceof String otp) || !otp.matches("\\d{6}")) throw PublicTrackingAuthorizationService.denied();
-        Map<String,Object> response=internalBody(userManagmentFeignClient.verifyTrackingOtp(
-            Map.of("challengeId",state.get("challengeId"),"otp",otp)));
-        if(!Boolean.TRUE.equals(response.get("verified")) || !(response.get("verificationData") instanceof Map<?,?> verified)
-            || !tenant.equals(verified.get("tenantId")) || !Integer.valueOf(service).equals(verified.get("serviceId"))
-            || !"O".equals(verified.get("mode")) || !method.equals(verified.get("method"))
-            || !"PUBLIC_TRACKING".equals(verified.get("purpose")) || !state.get("contact").equals(verified.get("recipient"))) throw PublicTrackingAuthorizationService.denied();
-        Map<String,Object> match=matchModeO(tenant,service,method,Map.of("contact",state.get("contact")));
-        List<String> ids=new ArrayList<>(matchedIds(match));ids.retainAll(matchedIds(state));
-        if(!publicAuthorization.consumeRequest((String)body.get("requestId"),state)) throw PublicTrackingAuthorizationService.denied();
-        return authorizedModeOApplications(tenant,service,method,config,ids);
-    }
+    public Map<String, Object> verifyServiceTrackingOtp(
+            Map<String, Object> body, HttpServletRequest request) {
+        onlyFields(body, "serviceId", "requestId", "otp");
 
-    public Map<String,Object> verifyServiceTrackingAttributes(Map<String,Object> body,HttpServletRequest request) {
-        onlyFields(body,"serviceId","values");
-        int service=modeOService(body);String tenant=resolveTenantId(request);
-        publicAuthorization.rateLimit(tenant,service,request.getRemoteAddr());
-        Map<String,Object> config=modeOConfig(tenant,service,"FORM_ATTRIBUTES");
-        if(!(body.get("values") instanceof Map<?,?> values) || values.size()<3 || values.size()>5) throw PublicTrackingAuthorizationService.denied();
-        Map<String,Object> match=matchModeO(tenant,service,"FORM_ATTRIBUTES",Map.of("values",values));
-        if(Boolean.TRUE.equals(match.get("sufficient"))) {
-            List<String> ids=matchedIds(match);
-            if(ids.size()==1) return authorizedModeOApplications(tenant,service,"FORM_ATTRIBUTES",config,ids);
+        int serviceId = modeOService(body);
+        String tenantId = resolveTenantId(request);
+        publicAuthorization.rateLimit(tenantId, serviceId, request.getRemoteAddr());
+
+        String requestId = Objects.toString(body.get("requestId"), "");
+        Map<String, Object> state = publicAuthorization.request(requestId);
+
+        if (!tenantId.equals(state.get("tenantId"))
+                || !Integer.valueOf(serviceId).equals(state.get("serviceId"))) {
+            throw PublicTrackingAuthorizationService.denied();
         }
-        return Map.of("message","Additional verification required","additionalVerificationRequired",true);
+
+        String method = Objects.toString(state.get("method"), "");
+        Map<String, Object> config = modeOConfig(tenantId, serviceId, method);
+
+        if (!publicAuthorization.fingerprint(config).equals(state.get("configuration"))
+                || !(state.get("challengeId") instanceof String challengeId)
+                || challengeId.isBlank()
+                || !(state.get("contact") instanceof String contact)
+                || contact.isBlank()) {
+            throw PublicTrackingAuthorizationService.denied();
+        }
+
+        if (!(body.get("otp") instanceof String otp) || !otp.matches("\\d{6}")) {
+            throw PublicTrackingAuthorizationService.denied();
+        }
+
+        Map<String, Object> verification = internalBody(
+                userManagmentFeignClient.verifyTrackingOtp(
+                        Map.of("challengeId", challengeId, "otp", otp)));
+
+        if (!Boolean.TRUE.equals(verification.get("verified"))
+                || !(verification.get("verificationData") instanceof Map<?, ?> verified)
+                || !tenantId.equals(verified.get("tenantId"))
+                || !Integer.valueOf(serviceId).equals(verified.get("serviceId"))
+                || !"O".equals(verified.get("mode"))
+                || !method.equals(verified.get("method"))
+                || !"PUBLIC_TRACKING".equals(verified.get("purpose"))
+                || !contact.equals(verified.get("recipient"))) {
+            throw PublicTrackingAuthorizationService.denied();
+        }
+
+        // Recheck the submitted form: no proof for a contact that changed since OTP send.
+        Map<String, Object> match = matchModeO(
+                tenantId, serviceId, method, Map.of("contact", contact));
+        List<String> applicationIds = new ArrayList<>(matchedIds(match));
+        applicationIds.retainAll(matchedIds(state));
+
+        if (!publicAuthorization.consumeRequest(requestId, state)) {
+            throw PublicTrackingAuthorizationService.denied();
+        }
+        return authorizedModeOApplications(tenantId, serviceId, method, config, applicationIds);
     }
 
-    private Map<String,Object> authorizedModeOApplications(String tenant,int service,String method,Map<String,Object> config,List<String> ids) {
-        List<Map<String,Object>> applications=new ArrayList<>();
-        String configuration=publicAuthorization.fingerprint(config);
-        for(String id:ids) {
-            List<ApplicationTracking> history=trackingRepository.findByApplIdAndTenantIdOrderByProcessIdAsc(id,tenant);
-            if(history.isEmpty() || history.stream().anyMatch(row->!Integer.valueOf(service).equals(row.getServiceId()))) continue;
-            ApplicationTracking first=history.getFirst();Map<String,Object> item=new LinkedHashMap<>();
-            item.put("applId",id);item.put("applRefNo",first.getApplRefNo());item.put("applyDate",first.getApplyDate());
-            item.put("serviceName",first.getServiceName());
-            item.put("verificationProof",publicAuthorization.issue(tenant,service,id,method,configuration));
+    public Map<String, Object> verifyServiceTrackingAttributes(
+            Map<String, Object> body, HttpServletRequest request) {
+        onlyFields(body, "serviceId", "values");
+
+        int serviceId = modeOService(body);
+        String tenantId = resolveTenantId(request);
+        publicAuthorization.rateLimit(tenantId, serviceId, request.getRemoteAddr());
+
+        Map<String, Object> config = modeOConfig(tenantId, serviceId, "FORM_ATTRIBUTES");
+        if (!(body.get("values") instanceof Map<?, ?> values)
+                || values.size() < 3 || values.size() > 5) {
+            throw PublicTrackingAuthorizationService.denied();
+        }
+
+        // FormDesigner enforces exact configured fields and a strong attribute.
+        Map<String, Object> match = matchModeO(
+                tenantId, serviceId, "FORM_ATTRIBUTES", Map.of("values", values));
+
+        if (Boolean.TRUE.equals(match.get("sufficient"))) {
+            List<String> applicationIds = matchedIds(match);
+            if (applicationIds.size() == 1) {
+                return authorizedModeOApplications(
+                        tenantId, serviceId, "FORM_ATTRIBUTES", config, applicationIds);
+            }
+        }
+        return Map.of(
+                "message", "Additional verification required",
+                "additionalVerificationRequired", true);
+    }
+
+    private Map<String, Object> authorizedModeOApplications(
+            String tenantId, int serviceId, String method,
+            Map<String, Object> config, List<String> applicationIds) {
+        List<Map<String, Object>> applications = new ArrayList<>();
+        String fingerprint = publicAuthorization.fingerprint(config);
+
+        for (String applicationId : applicationIds) {
+            List<ApplicationTracking> history = trackingRepository
+                    .findByApplIdAndTenantIdOrderByProcessIdAsc(applicationId, tenantId);
+            if (history.isEmpty()
+                    || history.stream().anyMatch(row ->
+                            !Integer.valueOf(serviceId).equals(row.getServiceId()))) {
+                continue;
+            }
+
+            ApplicationTracking first = history.getFirst();
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("applId", applicationId);
+            item.put("applRefNo", first.getApplRefNo());
+            item.put("applyDate", first.getApplyDate());
+            item.put("serviceName", first.getServiceName());
+            item.put("verificationProof", publicAuthorization.issue(
+                    tenantId, serviceId, applicationId, method, fingerprint));
             applications.add(item);
         }
-        return Map.of("applications",applications);
+        return Map.of("applications", applications);
     }
 
 }
