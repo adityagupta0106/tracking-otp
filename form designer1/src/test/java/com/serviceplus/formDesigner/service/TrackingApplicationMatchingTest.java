@@ -1,6 +1,8 @@
 package com.serviceplus.formDesigner.service;
 
 import com.serviceplus.formDesigner.controller.ApplicationDataController;
+import com.serviceplus.formDesigner.security.TrackingPeerCertificateAuthorization;
+import org.springframework.mock.web.MockHttpServletRequest;
 import com.serviceplus.formDesigner.repository.*;
 import com.serviceplus.formDesigner.feignClient.ServiceMataDataFeignClient;
 import com.serviceplus.formDesigner.returnToEdit.entity.FormDataReference;
@@ -36,11 +38,10 @@ class TrackingApplicationMatchingTest {
         service=new ApplicationDataService(repo,templates,null,null,null,keys,null,crypto,null,null,metadata,null,null,null,null,references);
         ReflectionTestUtils.setField(service,"trackingMaxScanRecords",10000);
         ReflectionTestUtils.setField(service,"trackingStrongAttributes","tenant:7:secret");
-        ReflectionTestUtils.setField(service,"trackingInternalToken","test-internal-token");
         config=new HashMap<>();config.put("serviceId",7);config.put("trackingTypes",List.of("MOBILE_OTP","EMAIL_OTP","FORM_ATTRIBUTES"));
         config.put("mobileAttribute",field("mobile",1));config.put("emailAttribute",field("email",3));
         config.put("formAttributes",List.of(field("secret",1),field("dob",8),field("amount",2)));
-        when(metadata.getPublicTrackingConfiguration("test-internal-token",7L,"tenant")).thenReturn(config);
+        when(metadata.getPublicTrackingConfiguration(7L,"tenant")).thenReturn(config);
         template=new ApplicationTemplate();template.setFormId("form");template.setTenantId("tenant");
         template.setFormJsonData(Map.of("globalSetting",Map.of(),"formElements",List.of(
             element("mobile",1),element("email",3),element("secret",1),element("dob",8),element("amount",2))));
@@ -82,7 +83,7 @@ class TrackingApplicationMatchingTest {
     @Test void modifiedFieldTypeNeverMatches(){config.put("formAttributes",List.of(field("secret",2),field("dob",8),field("amount",2)));Map<String,Object> body=attributes();body.put("values",Map.of("secret",1,"dob","2001-02-03","amount",1));assertEquals(false,service.matchTrackingApplications(body).get("sufficient"));}
     @Test void disabledMethodRejected(){config.put("trackingTypes",List.of("MOBILE_OTP"));assertThrows(IllegalArgumentException.class,()->service.matchTrackingApplications(attributes()));}
     @Test void unknownServiceFailsClosed(){Map<String,Object> body=attributes();body.put("serviceId",99);assertThrows(IllegalArgumentException.class,()->service.matchTrackingApplications(body));}
-    @Test void metadataFailureFailsClosed(){when(metadata.getPublicTrackingConfiguration("test-internal-token",7L,"tenant")).thenThrow(new IllegalStateException());assertThrows(IllegalStateException.class,()->service.matchTrackingApplications(attributes()));}
+    @Test void metadataFailureFailsClosed(){when(metadata.getPublicTrackingConfiguration(7L,"tenant")).thenThrow(new IllegalStateException());assertThrows(IllegalStateException.class,()->service.matchTrackingApplications(attributes()));}
     @Test void scanLimitNeverReturnsPartialMatches(){ReflectionTestUtils.setField(service,"trackingMaxScanRecords",0);assertThrows(IllegalStateException.class,()->service.matchTrackingApplications(attributes()));}
     @Test void encryptedDataUsesExistingDecryptorOnCopy() throws Exception {
         template.setEncryptionKeyAtRest("synthetic-key.iv");template.setFormJsonData(Map.of("globalSetting",Map.of("isEncryptionDataAtRest",true),"formElements",List.of()));
@@ -132,7 +133,18 @@ class TrackingApplicationMatchingTest {
     }
 
     @Test void mismatchedMetadataScopeFailsClosed(){config.put("serviceId",8);assertThrows(IllegalArgumentException.class,()->service.matchTrackingApplications(attributes()));}
-    @Test void bothTrackingOperationsRequireInternalAuthentication(){ApplicationDataService service=mock(ApplicationDataService.class);ApplicationDataController controller=new ApplicationDataController();ReflectionTestUtils.setField(controller,"applicationDataService",service);ReflectionTestUtils.setField(controller,"trackingInternalToken","synthetic-token");assertEquals(403,controller.matchTrackingApplications(Map.of(),null).getStatusCode().value());assertEquals(403,controller.getTrackingApplicationData(Map.of(),"wrong").getStatusCode().value());verifyNoInteractions(service);}
+    @Test void bothTrackingOperationsRejectRequestsWithoutClientCertificate() {
+        ApplicationDataService delegate = mock(ApplicationDataService.class);
+        ApplicationDataController controller = new ApplicationDataController();
+        ReflectionTestUtils.setField(controller, "applicationDataService", delegate);
+        ReflectionTestUtils.setField(controller, "trackingPeerAuthorization",
+                new TrackingPeerCertificateAuthorization("trackingservice.internal"));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(true);
+        assertEquals(403, controller.matchTrackingApplications(Map.of(), request).getStatusCode().value());
+        assertEquals(403, controller.getTrackingApplicationData(Map.of(), request).getStatusCode().value());
+        verifyNoInteractions(delegate);
+    }
 
     @Test
     void strongFieldPolicyMustMatchTenantServiceAndField() {
@@ -230,20 +242,21 @@ class TrackingApplicationMatchingTest {
     }
 
     @Test
-    void missingInternalTokenConfigurationNeverAllowsTrackingCalls() {
+    void unconfiguredPeerAllowlistNeverAllowsTrackingCalls() {
         ApplicationDataService delegate = mock(ApplicationDataService.class);
         ApplicationDataController controller = new ApplicationDataController();
         ReflectionTestUtils.setField(controller, "applicationDataService", delegate);
-        for (String token : new String[] {null, "", " "}) {
-            ReflectionTestUtils.setField(controller, "trackingInternalToken", token);
-            assertEquals(403, controller.matchTrackingApplications(Map.of(), "token").getStatusCode().value());
-            assertEquals(403, controller.getTrackingApplicationData(Map.of(), "token").getStatusCode().value());
-        }
+        ReflectionTestUtils.setField(controller, "trackingPeerAuthorization",
+                new TrackingPeerCertificateAuthorization(""));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(true);
+        assertEquals(403, controller.matchTrackingApplications(Map.of(), request).getStatusCode().value());
+        assertEquals(403, controller.getTrackingApplicationData(Map.of(), request).getStatusCode().value());
         verifyNoInteractions(delegate);
     }
 
     @Test
-    void metadataFeignContractSendsInternalTokenInHeaderWithTenantAndService() {
+    void metadataFeignContractUsesTenantAndServiceWithoutCustomHeader() {
         java.util.concurrent.atomic.AtomicReference<feign.Request> sent = new java.util.concurrent.atomic.AtomicReference<>();
         ServiceMataDataFeignClient client = feign.Feign.builder()
                 .contract(new org.springframework.cloud.openfeign.support.SpringMvcContract())
@@ -253,10 +266,9 @@ class TrackingApplicationMatchingTest {
                             .headers(Map.of()).body("{}", java.nio.charset.StandardCharsets.UTF_8).build();
                 }).decoder((response, type) -> config)
                 .target(ServiceMataDataFeignClient.class, "https://metadata.invalid/services");
-        assertSame(config, client.getPublicTrackingConfiguration("test-internal-token", 7L, "tenant"));
+        assertSame(config, client.getPublicTrackingConfiguration( 7L, "tenant"));
         assertEquals("https://metadata.invalid/services/internal/tracking/configuration?serviceId=7&tenantId=tenant",
                 sent.get().url());
-        assertEquals(List.of("test-internal-token"), new ArrayList<>(sent.get().headers().get("X-Tracking-Internal-Token")));
-        assertFalse(sent.get().url().contains("test-internal-token"));
+        assertFalse(sent.get().headers().containsKey("X-Tracking-Internal-Token"));
     }
 }
