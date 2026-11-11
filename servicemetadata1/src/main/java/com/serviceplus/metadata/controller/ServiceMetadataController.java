@@ -3,8 +3,6 @@ package com.serviceplus.metadata.controller;
 
 import java.util.List;
 import java.util.Map;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -34,6 +32,7 @@ import com.serviceplus.metadata.exception.SPRuntimeError;
 import com.serviceplus.metadata.service.SduAdoptionService;
 import com.serviceplus.metadata.service.ServiceMasterDataService;
 import com.serviceplus.metadata.service.ServiceMetadataService;
+import com.serviceplus.metadata.security.TrackingPeerCertificateAuthorization;
 import com.serviceplus.metadata.service.ServiceRequestService;
 import com.serviceplus.metadata.utility.CommonUtil;
 
@@ -74,16 +73,8 @@ public class ServiceMetadataController {
 
 	private static final Logger serviceMetadataLogger = LogManager.getLogger("serviceMetadataLogger");
 
-    @Value("${TRACKING_INTERNAL_TOKEN:}")
-    private String trackingInternalToken;
-
-    private boolean trustedTrackingCaller(String supplied) {
-        return trackingInternalToken != null && !trackingInternalToken.isBlank()
-                && supplied != null
-                && MessageDigest.isEqual(
-                        trackingInternalToken.getBytes(StandardCharsets.UTF_8),
-                        supplied.getBytes(StandardCharsets.UTF_8));
-    }
+    @Autowired
+    private TrackingPeerCertificateAuthorization trackingPeerAuthorization;
 
 	
 	@GetMapping("/task-allowed-action")
@@ -1127,8 +1118,8 @@ public class ServiceMetadataController {
     @GetMapping("/internal/tracking/configured-services")
     public ResponseEntity<List<Map<String, Object>>> getConfigureServices(
             @RequestParam("tenantId") String tenantId,
-            @RequestHeader(value = "X-Tracking-Internal-Token", required = false) String token) {
-        if (!trustedTrackingCaller(token)) {
+            HttpServletRequest request) {
+        if (!trackingPeerAuthorization.authorized(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(serviceMetadataService.getConfiguredServices(tenantId));
@@ -1138,8 +1129,8 @@ public class ServiceMetadataController {
     public ResponseEntity<Map<String, Object>> getPublicTrackingConfiguration(
             @RequestParam("serviceId") Long serviceId,
             @RequestParam("tenantId") String tenantId,
-            @RequestHeader(value = "X-Tracking-Internal-Token", required = false) String token) {
-        if (!trustedTrackingCaller(token)) {
+            HttpServletRequest request) {
+        if (!trackingPeerAuthorization.authorized(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(serviceMetadataService.getPublicTrackingConfig(serviceId, tenantId));
