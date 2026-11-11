@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ServiceMetadataTrackingContractTest {
     @Test
-    void realFeignTemplatesCarryTokenTenantAndCorrectMetadataPaths() {
+    void realFeignTemplatesCarryTenantWithoutCustomTrackingHeader() {
         List<Request> requests = new ArrayList<>();
         String prefix = ServiceMetadataFeignClient.class.getAnnotation(FeignClient.class).path();
         ServiceMetadataFeignClient client = Feign.builder().contract(new SpringMvcContract())
@@ -25,14 +25,13 @@ class ServiceMetadataTrackingContractTest {
                 .decoder((response, type) -> response.request().url().contains("configured-services") ? List.of() : Map.of())
                 .target(ServiceMetadataFeignClient.class, "https://metadata.invalid" + prefix);
 
-        client.getConfigureServices("test-shared-token", "tenant-a");
-        client.getPublicTrackingConfiguration("test-shared-token", 7L, "tenant-a");
+        client.getConfigureServices("tenant-a");
+        client.getPublicTrackingConfiguration(7L, "tenant-a");
         assertEquals("https://metadata.invalid/services/internal/tracking/configured-services?tenantId=tenant-a", requests.get(0).url());
         assertEquals("https://metadata.invalid/services/internal/tracking/configuration?serviceId=7&tenantId=tenant-a", requests.get(1).url());
         for (Request request : requests) {
             assertEquals(Request.HttpMethod.GET, request.httpMethod());
-            assertEquals(List.of("test-shared-token"), new ArrayList<>(request.headers().get("X-Tracking-Internal-Token")));
-            assertFalse(request.url().contains("test-shared-token"));
+            assertFalse(request.headers().containsKey("X-Tracking-Internal-Token"));
         }
     }
 }

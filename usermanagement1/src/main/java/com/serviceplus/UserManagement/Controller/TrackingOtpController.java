@@ -1,20 +1,18 @@
 package com.serviceplus.UserManagement.Controller;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.serviceplus.UserManagement.Service.TrackingOtpService;
+import com.serviceplus.UserManagement.security.TrackingPeerCertificateAuthorization;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -24,26 +22,19 @@ public class TrackingOtpController {
 
     private final TrackingOtpService otpService;
 
-    @Value("${TRACKING_INTERNAL_TOKEN:}")
-    private String trackingInternalToken;
+    @Autowired
+    private TrackingPeerCertificateAuthorization trackingPeerAuthorization;
 
     public TrackingOtpController(TrackingOtpService otpService) {
         this.otpService = otpService;
     }
 
-    private boolean authorized(String token) {
-        return trackingInternalToken != null && !trackingInternalToken.isBlank()
-                && token != null && MessageDigest.isEqual(trackingInternalToken.getBytes(StandardCharsets.UTF_8),
-                        token.getBytes(StandardCharsets.UTF_8));
-    }
-
     // Keep the original Mode R endpoint; delegate to the same sender as Mode O.
     @PostMapping("/send/email")
     public ResponseEntity<?> sendEmailOtp(@RequestBody Map<String, Object> body,
-            @RequestHeader(value = "X-Tracking-Internal-Token", required = false) String token,
             HttpServletRequest request) {
 
-        if (!authorized(token)) {
+        if (!trackingPeerAuthorization.authorized(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
@@ -58,15 +49,15 @@ public class TrackingOtpController {
         Map<String, Object> send = new HashMap<>(body);
         send.put("method", "EMAIL_OTP");
         send.put("contact", body.get("email"));
-        return sendOtp(send, token, request);
+        return sendOtp(send, request);
     }
 
     @PostMapping("/send")
     public ResponseEntity<?> sendOtp(
     		@RequestBody Map<String, Object> body,
-            @RequestHeader(value = "X-Tracking-Internal-Token", required = false) String token,  HttpServletRequest request) {
+            HttpServletRequest request) {
 
-        if (!authorized(token)) {
+        if (!trackingPeerAuthorization.authorized(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
@@ -96,9 +87,9 @@ public class TrackingOtpController {
 
     @PostMapping("/verify")
     public ResponseEntity<?> verifyOtp(@RequestBody Map<String, Object> body,
-            @RequestHeader(value = "X-Tracking-Internal-Token", required = false) String token) {
+            HttpServletRequest request) {
 
-        if (!authorized(token)) {
+        if (!trackingPeerAuthorization.authorized(request)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 

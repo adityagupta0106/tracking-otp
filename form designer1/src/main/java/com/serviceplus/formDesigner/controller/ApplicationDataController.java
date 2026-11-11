@@ -18,18 +18,15 @@ import com.serviceplus.formDesigner.dto.UserSessionDTO;
 import com.serviceplus.formDesigner.exception.SPRuntimeError;
 import com.serviceplus.formDesigner.request.model.ApplicationData;
 import com.serviceplus.formDesigner.service.ApplicationDataService;
+import com.serviceplus.formDesigner.security.TrackingPeerCertificateAuthorization;
 import com.serviceplus.formDesigner.util.CommonUtil;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 @RestController
 public class ApplicationDataController {
@@ -97,22 +94,15 @@ public class ApplicationDataController {
 			return applicationDataService.getApplicationAttributeValue(request, response, servletRequest);
 		}
 		
-		@Value("${TRACKING_INTERNAL_TOKEN:}")
-		private String trackingInternalToken;
-		
-		private boolean trustedTrackingCaller(String token) {
-			return trackingInternalToken != null && !trackingInternalToken.isBlank()
-			        && token != null && MessageDigest.isEqual(
-			            trackingInternalToken.getBytes(StandardCharsets.UTF_8),
-			            token.getBytes(StandardCharsets.UTF_8));
-		}
+		@Autowired
+		private TrackingPeerCertificateAuthorization trackingPeerAuthorization;
 
 		@PostMapping("/internal/tracking/application-data")
 		public ResponseEntity<?> getTrackingApplicationData(@RequestBody Map<String, Object> body,
-		        @RequestHeader(value = "X-Tracking-Internal-Token",required = false) String suppliedToken) {
+		        HttpServletRequest request) {
 
 		    // Only trusted internal microservices may access submitted values.
-		    if (!trustedTrackingCaller(suppliedToken)) {
+		    if (!trackingPeerAuthorization.authorized(request)) {
 		        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 		    }
 
@@ -173,8 +163,8 @@ public class ApplicationDataController {
 
     @PostMapping("/internal/tracking/match")
     public ResponseEntity<?> matchTrackingApplications(@RequestBody Map<String,Object> body,
-        @RequestHeader(value="X-Tracking-Internal-Token",required=false) String token) {
-        if (!trustedTrackingCaller(token))
+        HttpServletRequest request) {
+        if (!trackingPeerAuthorization.authorized(request))
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {return ResponseEntity.ok(applicationDataService.matchTrackingApplications(body));}
         catch(IllegalArgumentException ex) { ex.printStackTrace();return ResponseEntity.badRequest().body(Map.of("message","Invalid verification request"));}

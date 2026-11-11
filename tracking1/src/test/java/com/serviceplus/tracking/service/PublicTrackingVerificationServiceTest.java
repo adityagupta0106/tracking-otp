@@ -45,13 +45,12 @@ class PublicTrackingVerificationServiceTest {
                 mock(ApplicationTrackingRepositoryCustomImpl.class), registry,
                 mock(ApplicationTrackingHolderRepository.class), mock(ApplicationTrackingDocumentRepository.class),
                 mock(ApplicantInboxRepository.class), metadata, forms, users, authorization);
-        ReflectionTestUtils.setField(service, "trackingInternalToken", "internal-test-token");
         request = new MockHttpServletRequest();
         request.addHeader(CLIENT_DOMAIN_HEADER, "tenant.example");
         when(registry.fetchTenantId(anyMap())).thenReturn(ResponseEntity.ok("tenant"));
         config = new HashMap<>(Map.of("serviceId", 7, "trackingTypes",
                 List.of("MOBILE_OTP", "EMAIL_OTP", "FORM_ATTRIBUTES"), "displayActionTakenDate", false));
-        when(metadata.getPublicTrackingConfiguration("internal-test-token", 7L, "tenant")).thenReturn(config);
+        when(metadata.getPublicTrackingConfiguration(7L, "tenant")).thenReturn(config);
         when(authorization.fingerprint(any())).thenReturn("config-v1");
         when(authorization.saveRequest(anyMap())).thenReturn("request");
     }
@@ -75,13 +74,13 @@ class PublicTrackingVerificationServiceTest {
     }
 
     @Test
-    void metadataCallsCarryInternalTokenAndResolvedTenant() {
-        when(metadata.getConfigureServices("internal-test-token", "tenant"))
+    void metadataCallsUseResolvedTenantWithoutCustomHeader() {
+        when(metadata.getConfigureServices("tenant"))
                 .thenReturn(List.of(Map.of("serviceId", 7)));
         assertEquals(List.of(Map.of("serviceId", 7)), service.getConfiguredServices(request));
         assertSame(config, service.getPublicTrackingConfig(7L, request));
-        verify(metadata).getConfigureServices("internal-test-token", "tenant");
-        verify(metadata).getPublicTrackingConfiguration("internal-test-token", 7L, "tenant");
+        verify(metadata).getConfigureServices("tenant");
+        verify(metadata).getPublicTrackingConfiguration(7L, "tenant");
         verify(registry, times(2)).fetchTenantId(Map.of(CLIENT_DOMAIN_HEADER, "tenant.example"));
     }
 
@@ -97,13 +96,9 @@ class PublicTrackingVerificationServiceTest {
     }
 
     @Test
-    void disabledFeatureOrMissingInternalTokenPreventsVerification() {
+    void disabledFeaturePreventsVerification() {
         doThrow(new SPRuntimeError("Disabled", HttpStatus.SERVICE_UNAVAILABLE)).when(authorization)
                 .rateLimit(anyString(), anyInt(), anyString());
-        status(HttpStatus.SERVICE_UNAVAILABLE, () -> service.sendServiceTrackingOtp(otpBody(), request));
-        verifyNoInteractions(metadata, forms, users);
-        reset(authorization);
-        ReflectionTestUtils.setField(service, "trackingInternalToken", " ");
         status(HttpStatus.SERVICE_UNAVAILABLE, () -> service.sendServiceTrackingOtp(otpBody(), request));
         verifyNoInteractions(metadata, forms, users);
     }
@@ -136,14 +131,14 @@ class PublicTrackingVerificationServiceTest {
     @ParameterizedTest
     @ValueSource(strings = {"MOBILE_OTP", "EMAIL_OTP"})
     void matchedContactUsesTrustedRecipientAndStoresScopedRequest(String method) {
-        when(forms.matchTrackingApplications(eq("internal-test-token"), anyMap())).thenReturn(ResponseEntity.ok(
+        when(forms.matchTrackingApplications(anyMap())).thenReturn(ResponseEntity.ok(
                 Map.of("applicationIds", List.of("app"), "contact", "canonical-recipient")));
-        when(users.sendTrackingOtp(eq("internal-test-token"), anyMap()))
+        when(users.sendTrackingOtp(anyMap()))
                 .thenReturn(ResponseEntity.ok(Map.of("challengeId", "challenge")));
         Map<String, Object> result = service.sendServiceTrackingOtp(
                 Map.of("serviceId", 7, "method", method, "contact", "input"), request);
         assertEquals(Map.of("requestId", "request", "message", "If eligible, a verification code has been sent"), result);
-        verify(users).sendTrackingOtp("internal-test-token", Map.of("tenantId", "tenant", "serviceId", 7,
+        verify(users).sendTrackingOtp(Map.of("tenantId", "tenant", "serviceId", 7,
                 "mode", "O", "method", method, "contact", "canonical-recipient"));
         ArgumentCaptor<Map<String, Object>> state = ArgumentCaptor.forClass(Map.class);
         verify(authorization).saveRequest(state.capture());
@@ -155,7 +150,7 @@ class PublicTrackingVerificationServiceTest {
 
     @Test
     void unmatchedContactNeverTriggersDeliveryAndHasSamePublicResponse() {
-        when(forms.matchTrackingApplications(eq("internal-test-token"), anyMap()))
+        when(forms.matchTrackingApplications(anyMap()))
                 .thenReturn(ResponseEntity.ok(Map.of("applicationIds", List.of())));
         assertEquals(Map.of("requestId", "request", "message", "If eligible, a verification code has been sent"),
                 service.sendServiceTrackingOtp(otpBody(), request));
@@ -168,9 +163,9 @@ class PublicTrackingVerificationServiceTest {
 
     @Test
     void deliveryFailureUsesDecoyStateAndDoesNotLogSensitiveError(CapturedOutput output) {
-        when(forms.matchTrackingApplications(eq("internal-test-token"), anyMap())).thenReturn(ResponseEntity.ok(
+        when(forms.matchTrackingApplications(anyMap())).thenReturn(ResponseEntity.ok(
                 Map.of("applicationIds", List.of("app"), "contact", "sensitive-recipient")));
-        when(users.sendTrackingOtp(eq("internal-test-token"), anyMap()))
+        when(users.sendTrackingOtp(anyMap()))
                 .thenThrow(new IllegalStateException("sensitive-error-token"));
         assertEquals("request", service.sendServiceTrackingOtp(otpBody(), request).get("requestId"));
         ArgumentCaptor<Map<String, Object>> state = ArgumentCaptor.forClass(Map.class);
@@ -180,7 +175,6 @@ class PublicTrackingVerificationServiceTest {
         assertFalse(state.getValue().containsKey("challengeId"));
         assertFalse(output.getAll().contains("sensitive-error-token"));
         assertFalse(output.getAll().contains("sensitive-recipient"));
-        assertFalse(output.getAll().contains("internal-test-token"));
     }
 
     private Map<String, Object> verificationState() {
@@ -191,9 +185,9 @@ class PublicTrackingVerificationServiceTest {
         when(authorization.consumeRequest("request", state)).thenReturn(true);
         Map<String, Object> verified = new HashMap<>(Map.of("tenantId", "tenant", "serviceId", 7,
                 "mode", "O", "method", "EMAIL_OTP", "purpose", "PUBLIC_TRACKING", "recipient", "canonical-recipient"));
-        when(users.verifyTrackingOtp("internal-test-token", Map.of("challengeId", "challenge", "otp", "123456")))
+        when(users.verifyTrackingOtp(Map.of("challengeId", "challenge", "otp", "123456")))
                 .thenReturn(ResponseEntity.ok(Map.of("verified", true, "verificationData", verified)));
-        when(forms.matchTrackingApplications(eq("internal-test-token"), anyMap())).thenReturn(ResponseEntity.ok(
+        when(forms.matchTrackingApplications(anyMap())).thenReturn(ResponseEntity.ok(
                 Map.of("applicationIds", List.of("app", "new"), "contact", "canonical-recipient")));
         when(tracking.findByApplIdAndTenantIdOrderByProcessIdAsc("app", "tenant")).thenReturn(List.of(history("app", 7)));
         when(authorization.issue("tenant", 7, "app", "EMAIL_OTP", "config-v1")).thenReturn("proof");
@@ -220,11 +214,25 @@ class PublicTrackingVerificationServiceTest {
         Map<String, Object> verified = new HashMap<>(Map.of("tenantId", "tenant", "serviceId", 7,
                 "mode", "O", "method", "EMAIL_OTP", "purpose", "PUBLIC_TRACKING", "recipient", "canonical-recipient"));
         verified.put(field, "wrong");
-        when(users.verifyTrackingOtp(anyString(), anyMap()))
+        when(users.verifyTrackingOtp(anyMap()))
                 .thenReturn(ResponseEntity.ok(Map.of("verified", true, "verificationData", verified)));
         status(HttpStatus.FORBIDDEN, () -> service.verifyServiceTrackingOtp(verifyBody(), request));
         verify(authorization, never()).consumeRequest(anyString(), anyMap());
         verifyNoInteractions(tracking);
+    }
+
+    @Test
+    void malformedOtpRequestStateFailsBeforeUserManagementCall() {
+        Map<String, Object> state = verificationState();
+        clearInvocations(users);
+        state.remove("contact");
+        status(HttpStatus.FORBIDDEN, () -> service.verifyServiceTrackingOtp(verifyBody(), request));
+        verifyNoInteractions(users);
+
+        state.put("contact", "canonical-recipient");
+        state.remove("challengeId");
+        status(HttpStatus.FORBIDDEN, () -> service.verifyServiceTrackingOtp(verifyBody(), request));
+        verifyNoInteractions(users);
     }
 
     @Test
@@ -249,10 +257,10 @@ class PublicTrackingVerificationServiceTest {
     @Test
     void attributeVerificationRequiresUniqueMatchAndMatchingService() {
         Map<String, Object> body = Map.of("serviceId", 7, "values", Map.of("a", "A", "b", "B", "c", "C"));
-        when(forms.matchTrackingApplications(eq("internal-test-token"), anyMap()))
+        when(forms.matchTrackingApplications(anyMap()))
                 .thenReturn(ResponseEntity.ok(Map.of("sufficient", true, "applicationIds", List.of("app", "other"))));
         assertEquals(true, service.verifyServiceTrackingAttributes(body, request).get("additionalVerificationRequired"));
-        when(forms.matchTrackingApplications(eq("internal-test-token"), anyMap()))
+        when(forms.matchTrackingApplications(anyMap()))
                 .thenReturn(ResponseEntity.ok(Map.of("sufficient", true, "applicationIds", List.of("app"))));
         when(tracking.findByApplIdAndTenantIdOrderByProcessIdAsc("app", "tenant")).thenReturn(List.of(history("app", 8)));
         assertEquals(List.of(), service.verifyServiceTrackingAttributes(body, request).get("applications"));
@@ -264,7 +272,7 @@ class PublicTrackingVerificationServiceTest {
 
     @Test
     void malformedMatcherResponseFailsClosed() {
-        when(forms.matchTrackingApplications(eq("internal-test-token"), anyMap()))
+        when(forms.matchTrackingApplications(anyMap()))
                 .thenReturn(ResponseEntity.ok(Map.of("applicationIds", List.of(7))));
         status(HttpStatus.BAD_GATEWAY, () -> service.sendServiceTrackingOtp(otpBody(), request));
         verifyNoInteractions(users);
