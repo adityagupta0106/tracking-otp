@@ -9,7 +9,6 @@ import com.serviceplus.tracking.dto.FormAttributeRequest;
 
 
 import java.util.Map;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 @FeignClient(name = "formDesigner", path = "/formmgmt", url = "${formdesigner.service.url}")
 public interface FormDesignerFeignClient {
@@ -19,9 +18,8 @@ public interface FormDesignerFeignClient {
 
 
 	@PostMapping("/internal/tracking/application-data")
-	ResponseEntity<Map<String, Object>> getTrackingApplicationData( @RequestHeader("X-Tracking-Internal-Token") String token, @RequestBody Map<String, Object> request);
+	ResponseEntity<Map<String, Object>> getTrackingApplicationData( @RequestBody Map<String, Object> request);
 
     @PostMapping("/internal/tracking/match")
-    ResponseEntity<Map<String,Object>> matchTrackingApplications(@RequestHeader("X-Tracking-Internal-Token") String token,
-        @RequestBody Map<String,Object> request);
+    ResponseEntity<Map<String,Object>> matchTrackingApplications(@RequestBody Map<String,Object> request);
 }
