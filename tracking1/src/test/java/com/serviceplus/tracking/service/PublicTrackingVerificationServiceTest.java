@@ -222,6 +222,20 @@ class PublicTrackingVerificationServiceTest {
     }
 
     @Test
+    void malformedOtpRequestStateFailsBeforeUserManagementCall() {
+        Map<String, Object> state = verificationState();
+        clearInvocations(users);
+        state.remove("contact");
+        status(HttpStatus.FORBIDDEN, () -> service.verifyServiceTrackingOtp(verifyBody(), request));
+        verifyNoInteractions(users);
+
+        state.put("contact", "canonical-recipient");
+        state.remove("challengeId");
+        status(HttpStatus.FORBIDDEN, () -> service.verifyServiceTrackingOtp(verifyBody(), request));
+        verifyNoInteractions(users);
+    }
+
+    @Test
     void staleConfigurationOrCrossTenantRequestFailsBeforeOtpCheck() {
         Map<String, Object> state = verificationState(); clearInvocations(users);
         state.put("tenantId", "other");
