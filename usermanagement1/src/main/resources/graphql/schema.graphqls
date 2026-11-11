@@ -1,0 +1,31 @@
+type Query {
+   profile(id: ID): User
+   specificProfile(id: ID): User
+}
+
+type User {
+   u_userId: ID
+   ld_signNo: String
+   u_userName: String
+   u_emailId: String
+   u_mobileNo: String
+   u_clcId: Int
+   u_clcName: String
+   u_designationId: Int
+   u_cugType: String
+   u_approvalRequired: Boolean
+   u_middleName: String
+   u_lastName: String
+   u_dob: String
+   u_address: String
+   u_postalCode: String
+   u_profilePic: String
+   u_cDate: String
+   u_uDate: String
+   ul_categoryId: Int
+   ul_entityId: Int
+   ul_entityLevelId: Int
+   ul_entityLevelName: String
+   ul_locationId: Int
+   ul_locationName: String
+}

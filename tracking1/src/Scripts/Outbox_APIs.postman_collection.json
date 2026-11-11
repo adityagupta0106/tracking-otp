@@ -1,0 +1,863 @@
+{
+	"info": {
+		"_postman_id": "c1f7b789-8d76-4a92-b430-81f129e92bf1",
+		"name": "SP TrackingService - Outbox APIs",
+		"description": "Postman Collection for Outbox APIs in SP_TrackingService and Processing Gateway with Gateway Headers",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Get Pending Services",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/a/outbox/service-list",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"a",
+						"outbox",
+						"service-list"
+					]
+				},
+				"description": "Fetches distinct pending services in the Outbox with pending task application counts."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get Pending Task List",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/a/outbox/task-list?serviceId={{serviceId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"a",
+						"outbox",
+						"task-list"
+					],
+					"query": [
+						{
+							"key": "serviceId",
+							"value": "{{serviceId}}",
+							"description": "Service ID (e.g. 100010001 or baseServiceId * 10000)"
+						}
+					]
+				},
+				"description": "Fetches pending task list under a selected service in the Outbox."
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get Outbox Applications (Paginated)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/a/outbox/applications?serviceId={{serviceId}}&taskId={{taskId}}&applRefNo={{applRefNo}}&pageNo=0&pageSize=20",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"a",
+						"outbox",
+						"applications"
+					],
+					"query": [
+						{
+							"key": "serviceId",
+							"value": "{{serviceId}}",
+							"description": "Service ID"
+						},
+						{
+							"key": "taskId",
+							"value": "{{taskId}}",
+							"description": "Task ID"
+						},
+						{
+							"key": "applRefNo",
+							"value": "{{applRefNo}}",
+							"description": "Optional Application Reference Number"
+						},
+						{
+							"key": "pageNo",
+							"value": "0",
+							"description": "Zero-based page number"
+						},
+						{
+							"key": "pageSize",
+							"value": "20",
+							"description": "Number of records per page"
+						}
+					]
+				},
+				"description": "Fetches paginated list of applications in Outbox for a specific service and task."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Get Filter Attributes",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/a/outbox/filter-list?serviceId={{serviceId}}&taskId={{taskId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"a",
+						"outbox",
+						"filter-list"
+					],
+					"query": [
+						{
+							"key": "serviceId",
+							"value": "{{serviceId}}",
+							"description": "Service ID"
+						},
+						{
+							"key": "taskId",
+							"value": "{{taskId}}",
+							"description": "Task ID"
+						}
+					]
+				},
+				"description": "Fetches dynamic filter attributes configured for Outbox tasks."
+			},
+			"response": []
+		},
+		{
+			"name": "5. Get Workflow Outbox List (Tracking Service)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/a/workflow/outbox/list?page=0&size=30",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"a",
+						"workflow",
+						"outbox",
+						"list"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "0",
+							"description": "Zero-based page index"
+						},
+						{
+							"key": "size",
+							"value": "30",
+							"description": "Page size"
+						}
+					]
+				},
+				"description": "Fetches paginated workflow outbox applications list directly from Tracking Service (supports GET and POST)."
+			},
+			"response": []
+		},
+		{
+			"name": "6. Workflow Outbox List via Processing PathRouter (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{processingBaseUrl}}/a/workflow/outbox/list?page=0&size=30",
+					"host": [
+						"{{processingBaseUrl}}"
+					],
+					"path": [
+						"a",
+						"workflow",
+						"outbox",
+						"list"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "0",
+							"description": "Zero-based page index"
+						},
+						{
+							"key": "size",
+							"value": "30",
+							"description": "Page size"
+						}
+					]
+				},
+				"description": "Calls the processing gateway PathRouter endpoint POST /a/workflow/outbox/list which proxies through ReactiveApiClient to TrackingService."
+			},
+			"response": []
+		},
+		{
+			"name": "7. Pending Outbox Applications via Processing PathRouter (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{processingBaseUrl}}/a/outbox/applications?serviceId={{serviceId}}&taskId={{taskId}}&pageNo=0&pageSize=20",
+					"host": [
+						"{{processingBaseUrl}}"
+					],
+					"path": [
+						"a",
+						"outbox",
+						"applications"
+					],
+					"query": [
+						{
+							"key": "serviceId",
+							"value": "{{serviceId}}",
+							"description": "Service ID"
+						},
+						{
+							"key": "taskId",
+							"value": "{{taskId}}",
+							"description": "Task ID"
+						},
+						{
+							"key": "pageNo",
+							"value": "0",
+							"description": "Zero-based page number"
+						},
+						{
+							"key": "pageSize",
+							"value": "20",
+							"description": "Number of records per page"
+						}
+					]
+				},
+				"description": "Calls POST /a/outbox/applications on Form Validator (analogous to POST /a/inbox/applications)."
+			},
+			"response": []
+		},
+		{
+			"name": "8. Re-initiate Web Service - Scenario 1 (No Attempts Left)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"type\": 1,\n    \"serviceId\": {{serviceId}},\n    \"taskId\": \"{{taskId}}\",\n    \"applicationId\": []\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{processingBaseUrl}}/a/webservice/reinitiate",
+					"host": [
+						"{{processingBaseUrl}}"
+					],
+					"path": [
+						"a",
+						"webservice",
+						"reinitiate"
+					]
+				},
+				"description": "Scenario 1: Re-executes those applications which are failed and do NOT have any attempts left (exhausted). Resets retry attempts and executes immediately. Pass specific applicationIds or leave empty to process all."
+			},
+			"response": []
+		},
+		{
+			"name": "9. Re-initiate Web Service - Scenario 2 (Attempts Left)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "ATK",
+						"value": "{{ATK}}",
+						"type": "text"
+					},
+					{
+						"key": "Presid",
+						"value": "{{Presid}}",
+						"type": "text"
+					},
+					{
+						"key": "X-Csrf-Token",
+						"value": "{{X-Csrf-Token}}",
+						"type": "text"
+					},
+					{
+						"key": "SP-Client-Domain",
+						"value": "{{SP-Client-Domain}}",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json, text/plain, */*",
+						"type": "text"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.9",
+						"type": "text"
+					},
+					{
+						"key": "Cache-Control",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Pragma",
+						"value": "no-cache",
+						"type": "text"
+					},
+					{
+						"key": "Origin",
+						"value": "{{Origin}}",
+						"type": "text"
+					},
+					{
+						"key": "Referer",
+						"value": "{{Referer}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"type\": 2,\n    \"serviceId\": {{serviceId}},\n    \"taskId\": \"{{taskId}}\",\n    \"applicationId\": []\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{processingBaseUrl}}/a/webservice/reinitiate",
+					"host": [
+						"{{processingBaseUrl}}"
+					],
+					"path": [
+						"a",
+						"webservice",
+						"reinitiate"
+					]
+				},
+				"description": "Scenario 2: Re-executes only those failed applications which HAVE attempts left. Triggers immediate execution. Pass specific applicationIds or leave empty to process all."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://10.1.11.125:8082/spgateway/tracking",
+			"type": "string"
+		},
+		{
+			"key": "processingBaseUrl",
+			"value": "http://10.1.11.125:8082/spgateway/processing",
+			"type": "string"
+		},
+		{
+			"key": "ATK",
+			"value": "2116135241532968960e18ccf82-76e6-47fb-bda5-a497fb0bc852",
+			"type": "string"
+		},
+		{
+			"key": "Presid",
+			"value": "211613520412397158476ca539e-665a-46b4-a2a4-787ca2320fca",
+			"type": "string"
+		},
+		{
+			"key": "X-Csrf-Token",
+			"value": "DXksNiIS2J3GGvu4UItkdhEK",
+			"type": "string"
+		},
+		{
+			"key": "SP-Client-Domain",
+			"value": "10.1.11.35:8082",
+			"type": "string"
+		},
+		{
+			"key": "Origin",
+			"value": "http://10.1.11.35:8082",
+			"type": "string"
+		},
+		{
+			"key": "Referer",
+			"value": "http://10.1.11.35:8082/",
+			"type": "string"
+		},
+		{
+			"key": "serviceId",
+			"value": "100010001",
+			"type": "string"
+		},
+		{
+			"key": "taskId",
+			"value": "T1",
+			"type": "string"
+		},
+		{
+			"key": "applRefNo",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
