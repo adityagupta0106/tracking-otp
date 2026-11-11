@@ -34,7 +34,6 @@ import static com.serviceplus.tracking.utility.CommonUtil.getUserSessionDetails;
 import static com.serviceplus.tracking.utility.CommonUtil.isEmpty;
 import static java.util.Objects.isNull;
 
-import org.springframework.beans.factory.annotation.Value;
 
 import com.serviceplus.tracking.feignClient.ServiceMetadataFeignClient;
 
@@ -65,9 +64,6 @@ public class ApplicationTrackingService {
     private final FormDesignerFeignClient formDesignerFeignClient;
     private final UserManagmentFeignClient userManagmentFeignClient;
     private final PublicTrackingAuthorizationService publicAuthorization;
-
-    @Value("${TRACKING_INTERNAL_TOKEN:}")
-    private String trackingInternalToken;
 
 
     public ApplicationTrackingService(ApplicationTrackingRepository trackingRepository, WorkflowInboxRedisService workflowInboxRedisService, ApplicationTrackingRepositoryCustomImpl applicationTrackingRepositoryCustom, InstanceConfigRegistryFeignClient instanceConfigRegistryFeignClient, ApplicationTrackingHolderRepository applicationTrackingHolderRepository, ApplicationTrackingDocumentRepository applicationTrackingDocumentRepository, ApplicantInboxRepository applicantInboxRepository, ServiceMetadataFeignClient serviceMetadataFeignClient, FormDesignerFeignClient formDesignerFeignClient, UserManagmentFeignClient userManagmentFeignClient, PublicTrackingAuthorizationService publicAuthorization) {
@@ -438,7 +434,7 @@ public class ApplicationTrackingService {
 
     public List<Map<String, Object>> getConfiguredServices(HttpServletRequest request) {
         String tenantId = resolveTenantId(request);
-        return serviceMetadataFeignClient.getConfigureServices(trackingInternalToken, tenantId);
+        return serviceMetadataFeignClient.getConfigureServices(tenantId);
     }
 
     public Map<String, Object> getPublicTrackingConfig(Long serviceId, HttpServletRequest request) {
@@ -446,7 +442,7 @@ public class ApplicationTrackingService {
             throw new SPRuntimeError("Invalid service serviceId", HttpStatus.BAD_GATEWAY);
         }
         String tenantId = resolveTenantId(request);
-        return serviceMetadataFeignClient.getPublicTrackingConfiguration(trackingInternalToken, serviceId, tenantId);
+        return serviceMetadataFeignClient.getPublicTrackingConfiguration(serviceId, tenantId);
     }
 
 private Map<String, Object> fetchTrackingAttributes(String tenantId,Integer serviceId,String applId,List<String> attributeIds) {
@@ -454,9 +450,6 @@ private Map<String, Object> fetchTrackingAttributes(String tenantId,Integer serv
 
         throw new SPRuntimeError("Invalid tracking lookup request",HttpStatus.BAD_REQUEST);
     }
-    if (trackingInternalToken == null|| trackingInternalToken.isBlank()) {
-
-        throw new SPRuntimeError("Tracking internal authentication is not configured",HttpStatus.SERVICE_UNAVAILABLE);}
 
     Map<String, Object> requestBody = new HashMap<>();
     requestBody.put("tenantId", tenantId);
@@ -464,7 +457,7 @@ private Map<String, Object> fetchTrackingAttributes(String tenantId,Integer serv
     requestBody.put("applId", applId);
     requestBody.put("attributeIds", attributeIds);
 
-    ResponseEntity<Map<String, Object>> response =formDesignerFeignClient.getTrackingApplicationData(trackingInternalToken,requestBody);
+    ResponseEntity<Map<String, Object>> response =formDesignerFeignClient.getTrackingApplicationData(requestBody);
     if (response == null|| !response.getStatusCode().is2xxSuccessful()|| response.getBody() == null) {
 
         throw new SPRuntimeError("Application verification data unavailable",HttpStatus.BAD_GATEWAY);
@@ -509,7 +502,7 @@ public Map<String, Object> sendReferenceEmailOtp(PublicApplicationTrackingReques
     ApplicationTracking application = applications.get(0);
     Integer serviceId = application.getServiceId();
     String applId = application.getApplId();
-    Map<String, Object> config =serviceMetadataFeignClient.getPublicTrackingConfiguration(trackingInternalToken, serviceId.longValue(), tenantId);
+    Map<String, Object> config =serviceMetadataFeignClient.getPublicTrackingConfiguration(serviceId.longValue(), tenantId);
     Object types = config.get("trackingTypes");
     if (!(types instanceof List<?> trackingTypes)|| !trackingTypes.contains("EMAIL_OTP")) {
         throw new SPRuntimeError("Email verification is not available",HttpStatus.BAD_REQUEST);
@@ -536,7 +529,7 @@ public Map<String, Object> sendReferenceEmailOtp(PublicApplicationTrackingReques
     otpRequest.put("applId", applId);
     otpRequest.put("mode", "R");
     otpRequest.put("email", email);
-    ResponseEntity<Map<String, Object>> response =userManagmentFeignClient.sendTrackingEmailOtp(trackingInternalToken,otpRequest);
+    ResponseEntity<Map<String, Object>> response =userManagmentFeignClient.sendTrackingEmailOtp(otpRequest);
 
     if (response == null|| !response.getStatusCode().is2xxSuccessful()|| response.getBody() == null|| !(response.getBody().get("challengeId")
                  instanceof String challengeId)) {
@@ -547,8 +540,7 @@ public Map<String, Object> sendReferenceEmailOtp(PublicApplicationTrackingReques
 
     private Map<String,Object> modeOConfig(String tenant,int service,String method) {
         publicAuthorization.requireEnabled();
-        if(trackingInternalToken==null || trackingInternalToken.isBlank()) throw new SPRuntimeError("Tracking internal authentication unavailable",HttpStatus.SERVICE_UNAVAILABLE);
-        Map<String,Object> config=serviceMetadataFeignClient.getPublicTrackingConfiguration(trackingInternalToken, (long)service,tenant);
+        Map<String,Object> config=serviceMetadataFeignClient.getPublicTrackingConfiguration((long)service,tenant);
         if(config==null || !(config.get("serviceId") instanceof Number configuredService) || configuredService.longValue()!=service
             || !(config.get("trackingTypes") instanceof List<?> types)
             || types.isEmpty() || (method!=null && !types.contains(method))) throw PublicTrackingAuthorizationService.denied();
@@ -568,7 +560,7 @@ public Map<String, Object> sendReferenceEmailOtp(PublicApplicationTrackingReques
     private Map<String,Object> matchModeO(String tenant,int service,String method,Map<String,Object> input) {
         Map<String,Object> lookup=new HashMap<>(input);
         lookup.put("tenantId",tenant);lookup.put("serviceId",service);lookup.put("method",method);
-        return internalBody(formDesignerFeignClient.matchTrackingApplications(trackingInternalToken,lookup));
+        return internalBody(formDesignerFeignClient.matchTrackingApplications(lookup));
     }
 
     private Map<String,Object> internalBody(ResponseEntity<Map<String,Object>> response) {
@@ -630,7 +622,6 @@ public Map<String, Object> sendServiceTrackingOtp(
 
             Map<String, Object> sent = internalBody(
                     userManagmentFeignClient.sendTrackingOtp(
-                            trackingInternalToken,
                             Map.of(
                                     "tenantId", tenant,
                                     "serviceId", service,
@@ -685,7 +676,7 @@ public Map<String, Object> sendServiceTrackingOtp(
         Map<String,Object> config=modeOConfig(tenant,service,method);
         if(!publicAuthorization.fingerprint(config).equals(state.get("configuration")) || !state.containsKey("challengeId")) throw PublicTrackingAuthorizationService.denied();
         if(!(body.get("otp") instanceof String otp) || !otp.matches("\\d{6}")) throw PublicTrackingAuthorizationService.denied();
-        Map<String,Object> response=internalBody(userManagmentFeignClient.verifyTrackingOtp(trackingInternalToken,
+        Map<String,Object> response=internalBody(userManagmentFeignClient.verifyTrackingOtp(
             Map.of("challengeId",state.get("challengeId"),"otp",otp)));
         if(!Boolean.TRUE.equals(response.get("verified")) || !(response.get("verificationData") instanceof Map<?,?> verified)
             || !tenant.equals(verified.get("tenantId")) || !Integer.valueOf(service).equals(verified.get("serviceId"))
