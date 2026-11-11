@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-@FeignClient(name="SERVICEMETADATA",path="/services")
+@FeignClient(name="SERVICEMETADATA",path="/services",url="${servicemetadata.service.url:}")
 public interface ServiceMataDataFeignClient {
 
 	@GetMapping("/apply/usedAttributeList")
