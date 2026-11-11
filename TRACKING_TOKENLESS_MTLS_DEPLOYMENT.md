@@ -50,7 +50,7 @@ formdesigner.service.url=https://<formdesigner-internal-host>:<tls-port>
 usermanagement.service.url=https://<usermanagement-internal-host>:<tls-port>
 ```
 
-FormDesigner must also use an HTTPS ServiceMetadata target. Its `ServiceMataDataFeignClient` now supports a `servicemetadata.service.url` override; set it to the internal HTTPS metadata endpoint, or configure service discovery to advertise HTTPS. Ensure the actual Feign HTTP client can present the calling service's client certificate and validate the server certificate. Configure its keystore/truststore via your chosen Feign client SSL context; JVM default TLS system properties work only if that client honors them. Verify this in the full deployed project.
+FormDesigner must also call ServiceMetadata over HTTPS. Its existing `ServiceMataDataFeignClient` continues to use service discovery (unchanged to avoid affecting unrelated API calls), so the discovery target must advertise a TLS-enabled internal endpoint. Ensure the actual Feign HTTP client can present the calling service's client certificate and validate the server certificate. Configure its keystore/truststore via your chosen Feign client SSL context; JVM default TLS system properties work only if that client honors them. Verify this in the full deployed project.
 
 For each caller, client-certificate material must be managed as secrets. Example JVM system properties if supported by its actual Feign transport:
 
