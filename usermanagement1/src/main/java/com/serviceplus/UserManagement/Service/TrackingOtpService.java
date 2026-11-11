@@ -226,24 +226,6 @@ public class TrackingOtpService {
 
             stage = "ESB_SEND";
 
-//            NotificationResponseDTO response = esbFeign.send(notification);
-//
-//            if (response == null) {
-//
-//                stage = "ESB_RESPONSE";
-//
-//                throw new IllegalStateException("Notification response unavailable");
-//
-//            }
-//
-//            if (!response.isSuccess()) {
-//
-//                stage = "ESB_REJECTED";
-//
-//                throw new IllegalStateException("OTP notification rejected");
-//
-//            }
-            
             NotificationResponseDTO response = esbFeign.send(notification);
 
             if (response == null) {
